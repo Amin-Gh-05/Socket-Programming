@@ -1,68 +1,50 @@
 package Server;
 
-import java.io.*;
+import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 // Server Class
 public class Server {
-    public static void runServer() {
-        Socket socket = null;
-        InputStreamReader inputStreamReader = null;
-        OutputStreamWriter outputStreamWriter = null;
-        BufferedReader bufferedReader = null;
-        BufferedWriter bufferedWriter = null;
-        ServerSocket serverSocket;
+    private static final ExecutorService pool = Executors.newFixedThreadPool(10);
+    private final ServerSocket serverSocket;
 
+    Server(ServerSocket serverSocket) {
+        this.serverSocket = serverSocket;
+    }
+
+    public static void main(String[] args) throws IOException {
+        ServerSocket socket = new ServerSocket(4321);
+        Server server = new Server(socket);
+        server.runServer();
+    }
+
+    public void runServer() {
         try {
-            serverSocket = new ServerSocket(1234);
-            socket = serverSocket.accept();
-            // get and give stream from and to socket
-            inputStreamReader = new InputStreamReader(socket.getInputStream());
-            outputStreamWriter = new OutputStreamWriter(socket.getOutputStream());
-            // wrap in buffer
-            bufferedReader = new BufferedReader(inputStreamReader);
-            bufferedWriter = new BufferedWriter(outputStreamWriter);
-
-            while (true) {
-                String message = bufferedReader.readLine();
-                System.out.println("CLIENT: " + message);
-                // send message to client
-                bufferedWriter.write("message received");
-                bufferedWriter.newLine();
-                bufferedWriter.flush();
-
-                // break the loop
-                if (message.equalsIgnoreCase("BYE")) {
-                    break;
-                }
+            while (!serverSocket.isClosed()) {
+                Socket socket = serverSocket.accept();
+                System.out.println("| a new client is connected");
+                ClientHandler clientHandler = new ClientHandler(socket);
+                // create a thread for each client
+                Thread thread = new Thread(clientHandler);
+                pool.execute(thread);
             }
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            System.out.println("| " + e);
         } finally {
-            try {
-                if (socket != null) {
-                    socket.close();
-                }
-                if (inputStreamReader != null) {
-                    inputStreamReader.close();
-                }
-                if (outputStreamWriter != null) {
-                    outputStreamWriter.close();
-                }
-                if (bufferedReader != null) {
-                    bufferedReader.close();
-                }
-                if (bufferedWriter != null) {
-                    bufferedWriter.close();
-                }
-            } catch (IOException e) {
-                e.getMessage();
-            }
+            stopServer();
         }
     }
 
-    public static void main(String[] args) {
-        runServer();
+    public void stopServer() {
+        try {
+            if (!serverSocket.isClosed()) {
+                serverSocket.close();
+            }
+        } catch (IOException e) {
+            System.out.println("| " + e);
+        }
     }
 }

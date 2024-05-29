@@ -1,69 +1,78 @@
 package Client;
 
-import java.io.*;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.net.Socket;
 import java.util.Scanner;
 
 // Client Class
 public class Client {
-    public static void connectServer() {
-        Socket socket = null;
-        InputStreamReader inputStreamReader = null;
-        OutputStreamWriter outputStreamWriter = null;
-        BufferedReader bufferedReader = null;
-        BufferedWriter bufferedWriter = null;
+    private Socket socket;
+    private BufferedWriter bufferedWriter;
+    private String username;
 
+    Client(Socket socket, String username) {
         try {
-            socket = new Socket("localhost", 1234);
-            // get and give stream from and to socket
-            inputStreamReader = new InputStreamReader(socket.getInputStream());
-            outputStreamWriter = new OutputStreamWriter(socket.getOutputStream());
-            // wrap in buffer
-            bufferedReader = new BufferedReader(inputStreamReader);
-            bufferedWriter = new BufferedWriter(outputStreamWriter);
-            // get user input from keyboard
-            Scanner scanner = new Scanner(System.in);
+            this.socket = socket;
+            this.username = username;
+            bufferedWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+        } catch (IOException e) {
+            closeAll();
+        }
+    }
 
-            while (true) {
-                // send message to server
+    public static void main(String[] args) throws IOException {
+        Scanner scanner = new Scanner(System.in);
+
+        System.out.print("please enter your username: ");
+        String username = scanner.nextLine();
+
+        Socket socket = new Socket("localhost", 4321);
+        Client client = new Client(socket, username);
+        client.sendMessage();
+    }
+
+    public void sendMessage() {
+        try {
+            bufferedWriter.write(username);
+            bufferedWriter.newLine();
+            bufferedWriter.flush();
+
+            // create a new thread for listening to others' messages
+            MessageHandler messageHandler = new MessageHandler(socket);
+            Thread listener = new Thread(messageHandler);
+            listener.start();
+
+            // get input from user and send it
+            Scanner scanner = new Scanner(System.in);
+            while (socket.isConnected()) {
                 String message = scanner.nextLine();
-                bufferedWriter.write(message);
+                bufferedWriter.write("| " + username + ": " + message);
                 bufferedWriter.newLine();
                 bufferedWriter.flush();
-                // log server messages
-                System.out.println("SERVER: " + bufferedReader.readLine());
-
-                // break the loop
-                if (message.equalsIgnoreCase("BYE")) {
+                // quit chat by typing "exit"
+                if (message.equals("exit")) {
+                    listener.interrupt();
+                    closeAll();
                     break;
                 }
             }
         } catch (IOException e) {
-            throw new RuntimeException(e);
-        } finally {
-            try {
-                if (socket != null) {
-                    socket.close();
-                }
-                if (inputStreamReader != null) {
-                    inputStreamReader.close();
-                }
-                if (outputStreamWriter != null) {
-                    outputStreamWriter.close();
-                }
-                if (bufferedReader != null) {
-                    bufferedReader.close();
-                }
-                if (bufferedWriter != null) {
-                    bufferedWriter.close();
-                }
-            } catch (IOException e) {
-                e.getMessage();
-            }
+            closeAll();
         }
     }
 
-    public static void main(String[] args) {
-        connectServer();
+    public void closeAll() {
+        try {
+            if (bufferedWriter != null) {
+                bufferedWriter.close();
+            }
+            if (socket != null) {
+                socket.close();
+            }
+        } catch (IOException e) {
+            System.out.println(e.getMessage());
+        }
     }
 }
