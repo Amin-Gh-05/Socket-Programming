@@ -1,17 +1,16 @@
 package Client;
 
-import java.io.BufferedReader;
+import java.io.DataInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.net.Socket;
 
 public class MessageHandler implements Runnable {
     private final Socket socket;
-    private final BufferedReader bufferedReader;
+    private final DataInputStream in;
 
     MessageHandler(Socket socket) throws IOException {
         this.socket = socket;
-        bufferedReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        in = new DataInputStream(socket.getInputStream());
     }
 
     @Override
@@ -20,7 +19,7 @@ public class MessageHandler implements Runnable {
 
         while (socket.isConnected()) {
             try {
-                message = bufferedReader.readLine();
+                message = in.readUTF();
                 System.out.println(message);
             } catch (IOException e) {
                 closeAll();
@@ -30,8 +29,8 @@ public class MessageHandler implements Runnable {
 
     public void closeAll() {
         try {
-            if (bufferedReader != null) {
-                bufferedReader.close();
+            if (in != null) {
+                in.close();
             }
             if (socket != null) {
                 socket.close();
